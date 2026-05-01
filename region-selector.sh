@@ -106,20 +106,6 @@ do_record() {
     local region="$1"
     local file="$RECORDINGS_DIR/rec-$(date +%Y%m%d-%H%M%S).mkv"
 
-    if pgrep -x wf-recorder > /dev/null 2>&1; then
-        local response
-        response=$(notify-send -a "RegionSelector" -A "stop=Stop & Save" -A "continue=Continue" "Recording in progress" "A recording is already running" --action=stop,continue)
-        case "$response" in
-            "stop")
-                pkill -x wf-recorder
-                sleep 0.5
-                ;;
-            "continue")
-                exit 0
-                ;;
-        esac
-    fi
-
     wf-recorder --geometry "$region" -f "$file" &
     sleep 0.3
 
@@ -153,6 +139,19 @@ main() {
             else
                 notify-send -a "RegionSelector" "Recording saved"
             fi
+        fi
+        exit 0
+    fi
+
+    if [ "$action" = "record" ] && pgrep -x wf-recorder > /dev/null 2>&1; then
+        pkill -x wf-recorder
+        sleep 0.5
+        local latest
+        latest=$(ls -t "$RECORDINGS_DIR"/*.mkv 2>/dev/null | head -1)
+        if [ -n "$latest" ]; then
+            notify-send -a "RegionSelector" -A "open=Open" -A "folder=Folder" "Recording saved" "$latest" --action=open,folder
+        else
+            notify-send -a "RegionSelector" "Recording saved"
         fi
         exit 0
     fi
