@@ -4,8 +4,9 @@
 # Usage:
 #   region-selector screenshot  - Take screenshot of selected region
 #   region-selector ocr         - Extract text from selected region
-#   region-selector search      - Search image via Yandex
-#   region-selector record      - Record selected region (with overlap protection)
+#   region-selector search      - Search image via Google Lens
+#   region-selector record      - Record selected region (auto-saves prev)
+#   region-selector stop       - Stop active recording
 #
 # Dependencies:
 #   - slurp, grim, wl-copy     (Wayland screenshot tools)
@@ -95,7 +96,7 @@ do_search() {
     upload_url=$(curl -sf -F "reqtype=fileupload" -F "fileToUpload=@$TEMP_DIR/search.png" https://catbox.moe/user/api.php)
 
     if [ -n "$upload_url" ]; then
-        xdg-open "https://yandex.com/images/search?rpt=imageview&url=${upload_url}"
+        xdg-open "https://lens.google.com/uploadbyurl?url=${upload_url}"
     else
         notify-send -a "RegionSelector" "Search Error" "Failed to upload image"
     fi
@@ -140,6 +141,22 @@ do_record() {
 
 main() {
     local action="${1:-screenshot}"
+
+    if [ "$action" = "stop" ]; then
+        if pgrep -x wf-recorder > /dev/null 2>&1; then
+            pkill -x wf-recorder
+            sleep 0.5
+            local latest
+            latest=$(ls -t "$RECORDINGS_DIR"/*.mkv 2>/dev/null | head -1)
+            if [ -n "$latest" ]; then
+                notify-send -a "RegionSelector" -A "open=Open" -A "folder=Folder" "Recording saved" "$latest" --action=open,folder
+            else
+                notify-send -a "RegionSelector" "Recording saved"
+            fi
+        fi
+        exit 0
+    fi
+
     local region
     region=$(select_region)
 
@@ -148,8 +165,9 @@ main() {
         ocr)        do_ocr "$region" ;;
         search)     do_search "$region" ;;
         record)     do_record "$region" ;;
+        stop)       ;;
         *)
-            echo "Usage: $0 {screenshot|ocr|search|record}" >&2
+            echo "Usage: $0 {screenshot|ocr|search|record|stop}" >&2
             exit 1
             ;;
     esac
